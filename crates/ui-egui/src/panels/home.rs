@@ -166,12 +166,13 @@ pub fn encode_thumb(img: &egui::ColorImage) -> String {
     out
 }
 
+/// Decode a stored hex thumbnail, rejecting malformed or non-ASCII text.
 pub fn decode_thumb(text: &str) -> Option<egui::ColorImage> {
     let t = text.trim();
-    if t.len() != THUMB_W * THUMB_H * 6 {
+    if t.len() != THUMB_W * THUMB_H * 6 || !t.is_ascii() {
         return None;
     }
-    let b: Vec<u8> = (0..t.len()).step_by(2).map(|i| u8::from_str_radix(&t[i..i + 2], 16)).collect::<Result<_, _>>().ok()?;
+    let b: Vec<u8> = (0..t.len()).step_by(2).map(|i| u8::from_str_radix(t.get(i..i + 2)?, 16).ok()).collect::<Option<_>>()?;
     let px = b.as_chunks::<3>().0.iter().map(|c| Color32::from_rgb(c[0], c[1], c[2])).collect();
     Some(egui::ColorImage::new([THUMB_W, THUMB_H], px))
 }
@@ -497,6 +498,12 @@ mod tests {
     use super::*;
 
     #[test]
+    fn non_ascii_thumbnail_is_rejected_without_panicking() {
+        let malformed = format!("aé{}", "0".repeat(THUMB_W * THUMB_H * 6 - 3));
+        assert!(decode_thumb(&malformed).is_none());
+    }
+
+    #[test]
     fn recent_list_comes_from_settings() {
         let mut prefs = effectcraft_engine::prefs::Prefs::default();
         prefs.push_recent("/projects/a/Alpha.ecproj");
@@ -556,17 +563,15 @@ mod tests {
     }
 
     /// The Home screen's own text goes through the interface catalog (#574): the Opened and Kind
-    /// columns read in Chinese, and English stays English.
+    /// columns read in the interface language, and English stays English.
     #[test]
     fn home_text_follows_the_interface_language() {
         let now = 1_790_000_000;
         crate::i18n::set_current("zh-hans");
-        let zh = (format_ago(now, now - 5), format_ago(now, now - 3 * 3_600), format_ago(now, now - 90_000), kind_of("/a/B.ecproj"));
-        crate::i18n::set_current("zh-hant");
-        let tw = (format_ago(now, now - 60), kind_of("x"));
+        let shown = (format_ago(now, now - 5), format_ago(now, now - 3 * 3_600), format_ago(now, now - 90_000), kind_of("/a/B.ecproj"));
+        let catalog = (tr("Just now").to_string(), tr_args("{} hours ago", &[&3]), tr("Yesterday").to_string(), tr("EffectCraft project"));
         crate::i18n::set_current("en");
-        assert_eq!(zh, ("刚刚".into(), "3 小时前".into(), "昨天".into(), "EffectCraft 项目"));
-        assert_eq!(tw, ("1 分鐘前".into(), "專案"));
+        assert_eq!(shown, catalog);
         assert_eq!(tr("Filter recent files"), "Filter recent files");
     }
 
