@@ -6,8 +6,8 @@ use effectcraft_project::BitDepth;
 use effectcraft_render::RenderOpts;
 use effectcraft_time::Tick;
 
+use crate::tests::adjust::adjustment_scene;
 use crate::tests::{Scene, allow_llvmpipe_boundary_flips, c, check, compare_at, effect_case, n, opts, set};
-use crate::tests_adjust::adjustment_scene;
 
 fn e(v: u32) -> Value {
     Value::Enum(v)
